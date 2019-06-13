@@ -56,17 +56,17 @@ var links = [{
   ]
 
 var mapMenu = {
-  'camera-khong-day-dahua-2.json' : 0,
-  'camera-khong-day-dahua.json' : 0,
-  'camera-khong-day-hikvision.json' : 0,
-  'camera-quan-sat-dahua.json' : 0,
-  'camera-quan-sat-hikvision-2.json' : 0,
-  'camera-quan-sat-hikvision.json' : 0,
-  'camera-quan-sat-osamic-2.json' : 0,
-  'camera-quan-sat-osamic.json' : 0,
-  'dau-ghi-hinh-dahua.json' : 0,
-  'dau-ghi-hinh-hikvision.json' : 0,
-  'dau-ghi-hinh-osamic.json' : 0,
+  'camera-khong-day-dahua-2.json' : 19,
+  'camera-khong-day-dahua.json' : 19,
+  'camera-khong-day-hikvision.json' : 18,
+  'camera-quan-sat-dahua.json' : 15,
+  'camera-quan-sat-hikvision-2.json' : 14,
+  'camera-quan-sat-hikvision.json' : 14,
+  'camera-quan-sat-osamic-2.json' : 16,
+  'camera-quan-sat-osamic.json' : 16,
+  'dau-ghi-hinh-dahua.json' : 11,
+  'dau-ghi-hinh-hikvision.json' : 10,
+  'dau-ghi-hinh-osamic.json' : 12,
 }
 
 
@@ -104,11 +104,11 @@ function createSlug(str){
   return slug;
 }
 
-//readAndWriteSql()
+readAndWriteSql()
 
-test()
+//createImageFolder(1, 'large_dau-ghi-hinh-osamic-osd-8420sh-5463.jpg')
 
-function test(){
+function createImageFolder(imageId, imageName){
 
   var images = [
     './images/large_dau-ghi-hinh-osamic-osd-8420sh-5463.jpg',
@@ -212,43 +212,60 @@ function test(){
     './images/p_27084_ezviz-cs-cv310-5503.jpg',
     './images/p_27084_ezviz-cs-cv310-8700.jpg',
   ]
-  //for (var i = 0; i <images.length; i++) {
-    // input stream
-    let inStream = fs.createReadStream(images[0]);
 
-    // output stream
-    let outStream = fs.createWriteStream('output.jpg', {flags: "w"});
+  var dimensions = {
+    'original' : '',
+    'icon64' : [64, 64],
+    'icon32' : [32, 32],
+    'thumbnail256' : [256, 256],
+    'large' : [900, 900],
+  }
+
+  var pathOut = './imagesOut/'
+  var pathIn = './images/'
+
+  for(var key in dimensions){
+    let option = {
+      fit: 'contain',
+      position: sharp.strategy.entropy,
+      background: { r: 255, g: 255, b: 255 }
+    }
+    if(key == 'original'){
+      //console.log('key original')
+    }else{
+      option.width = dimensions[key][0]
+      option.height = dimensions[key][0]
+    }
+
+    let inStream = fs.createReadStream(pathIn + imageName);
+    fs.mkdirSync(pathOut + imageId + '/' + key +'/', { recursive: true });
+    let outStream = fs.createWriteStream(pathOut + imageId + '/' + key +'/' + imageName, {flags: "w"});
 
     // on error of output file being saved
-    outStream.on('error', function() {
-        console.log("Error");
-    });
-
-    // on success of output file being saved
-    outStream.on('close', function() {
-        console.log("Successfully saved file");
+    outStream.on('error', function(e) {
+        console.log("Error", e);
     });
 
     // input stream transformer
     // "info" event will be emitted on resize
-    let transform = sharp()
-                        .resize({ width: 400, height: 400 })
-                        .on('info', function(fileInfo) {
-                            console.log("Resizing done, file not saved");
-                        });
+    let transform = sharp().resize(option)
+      .on('info', function(fileInfo) {
+        console.log("Resizing done, file not saved");
+      });
 
     inStream.pipe(transform).pipe(outStream);
-  //} // end for
+  } // end for
+
 }
 
 function readAndWriteSql(){
   const testFolder = './file/camera/';
   var count = 0;
+  var idProductBase = 9;
+  var idImageBase = 9;
 
   fs.readdirSync(testFolder).forEach(file => {
     console.log(testFolder + file);
-    var idProductBase = 34;
-    var idImageBase = 34;
 
     var sqlProduct ="INSERT INTO `products` (`id`, `thumbnail`, `price`, `code`, `is_new`, `view_count`, `created_at`, `updated_at`) VALUES ('IN_ID', '', 'IN_PRICE', 'IN_CODE', '0', '0', '2019-06-13 06:39:18', '2019-06-13 06:39:18');";
 
@@ -260,51 +277,48 @@ function readAndWriteSql(){
 
     count++;
 
-    fs.readFile(testFolder + file, 'utf8',  function(err,data){
+    var data = fs.readFileSync(testFolder + file, 'utf8')
+
+    if(!data) return;
+
+    let contentSql = "";
+
+    //data = data.slice(0,1);
+    data = JSON.parse(data).products
+
+    for(var item of data){
+      //arrImage.push(item.image.split('/').slice(-1)[0])
+      arrImage.push(item.image)
+
+      let writeSqlProduct = sqlProduct.replace('IN_ID', idProductBase)
+        .replace('IN_PRICE', item.price)
+        .replace('IN_CODE', item.code);
+console.log('mapMenu[file]',file , mapMenu[file])
+      let writeSqlProductLanguage = sqlProductLanguage.replace('IN_MENU_ID', mapMenu[file])
+        .replace('IN_PRODUCT_ID', idProductBase)
+        .replace('IN_NAME', item.name)
+        .replace('IN_DETAIL', item.detail)
+        .replace('IN_SLUG', createSlug(item.name))
+        .replace('IN_META_TITLE', item.name)
+        .replace('IN_META_DESC', item.seo_desc)
+
+      let writeSqlImageProduct = sqlImageProduct.replace('IN_PATH_NAME_IMAGE', item.image.split('/').slice(-1)[0])
+        .replace('IN_IMAGE_ID', idImageBase)
+        .replace('IN_PRODUCT_ID', idProductBase)
+
+      contentSql = contentSql + writeSqlProduct + "\n" + writeSqlProductLanguage + "\n" + writeSqlImageProduct + "\n\n";
+      idProductBase++
+      idImageBase++
+    } // end for
+
+    //console.log('arrImage', arrImage)
+
+    fs.appendFile('sql/camera/camera.sql', contentSql, 'utf8', function(err){
       if(err) throw err;
-      else {
-         // data = data.split('\n');
-      }
-      if(!data) return;
-
-      let contentSql = "";
-
-      //data = data.slice(0,1);
-      data = JSON.parse(data).products
-
-      for(var item of data){
-        //arrImage.push(item.image.split('/').slice(-1)[0])
-        arrImage.push(item.image)
-
-        let writeSqlProduct = sqlProduct.replace('IN_ID', idProductBase)
-          .replace('IN_PRICE', item.price)
-          .replace('IN_CODE', item.code);
-
-        let writeSqlProductLanguage = sqlProductLanguage.replace('IN_MENU_ID', mapMenu[file])
-          .replace('IN_PRODUCT_ID', idProductBase)
-          .replace('IN_NAME', item.name)
-          .replace('IN_DETAIL', item.detail)
-          .replace('IN_SLUG', createSlug(item.name))
-          .replace('IN_META_TITLE', item.name)
-          .replace('IN_META_DESC', item.seo_desc)
-
-        let writeSqlImageProduct = sqlImageProduct.replace('IN_PATH_NAME_IMAGE', item.image.split('/').slice(-1)[0])
-          .replace('IN_IMAGE_ID', idImageBase)
-          .replace('IN_PRODUCT_ID', idProductBase)
-
-        contentSql = contentSql + writeSqlProduct + "\n" + writeSqlProductLanguage + "\n" + writeSqlImageProduct + "\n\n";
-        idProductBase++
-        idImageBase++
-      } // end for
-
-      console.log('arrImage', arrImage)
-
-      fs.appendFile('sql/camera/camera.sql', contentSql, 'utf8', function(err){
-        if(err) throw err;
-        else console.log('write sql ' + file + ' success!');
-      });
+      else console.log('write sql ' + file + ' success!');
     });
-  })
+
+  });
 
 }
 
